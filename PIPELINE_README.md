@@ -1,0 +1,30 @@
+# Pegasus — modules périphériques du palier 1
+
+Ces modules entourent le cœur verrouillé (`models.py`, `config.py`, `filter.py`, `scorer.py`, `consensus.py`) sans en modifier les seuils, poids, seeds ni formules.
+
+## Ordre d’appel
+
+`LonabIngestion.fetch(date)` localise la ligne exacte du journal demandé, suit le vrai lien `Télécharger`, télécharge le PDF et produit des `Horse`. `detect_discipline(type_officiel, texte_pdf)` renvoie `trot`, `plat` ou `obstacle`. `MarketWatch.update(horses)` doit être appelé avant `apply_filter`; il remplit `cote_actuelle` seulement quand une cote vérifiée est reçue et conserve `None` sinon. Le cœur peut ensuite être appelé avec `apply_filter`, `score_group` puis `compute_classement`.
+
+## Extraction et données manquantes
+
+L’extraction déterministe s’appuie sur `pypdf` et le repli `pdftotext -layout`, particulièrement utile pour les tableaux de partants LONAB. Les champs effectivement lisibles dans le PDF sont les numéros, noms, gains et première cote imprimée dans la colonne officielle du document. Les notes BaseScorer, l’historique ferrure et la cote actuelle ne sont pas inventés : ils restent neutres/`None` conformément au contrat et sont inscrits dans `missing_fields` ou les avertissements du résultat.
+
+Le nom et la cote sont extraits de manière conservatrice. Une validation métier reste nécessaire avant production si un nouveau gabarit PDF apparaît. Le module ne transforme pas automatiquement les commentaires narratifs en notes historiques ou forme, car cela introduirait une donnée non vérifiée.
+
+## MarketWatch
+
+`MarketWatch` est un orchestrateur d’adaptateurs gratuits. Il essaie les fournisseurs dans l’ordre donné, s’arrête au premier résultat non vide, calcule le delta relatif et signale toute cote manquante ou tout non-partant. Aucun fournisseur de cotes live n’est activé par défaut dans ce palier : un appelant doit fournir un adaptateur vérifiable. L’API open-pmu-api n’est pas une source de cotes live ; elle sert aux résultats officiels et à l’évaluation J+1.
+
+## Résultats officiels
+
+`OpenPmuApiClient` utilise `https://open-pmu-api.vercel.app/api/arrivees` avec le format de date MM/DD/YYYY observé dans l’implémentation et les exemples fonctionnels du dépôt `nanaelie/open-pmu-api`. La réponse historique est distincte de MarketWatch et ne doit pas être injectée dans le scoring pré-course.
+
+## Tests exécutés
+
+```bash
+python3 -m unittest pegasus_core.test_pipeline -v
+python3 -m unittest pegasus_core.test_core -v
+```
+
+Le test live réalisé le 22 septembre 2026 a récupéré le journal LONAB du 17 septembre 2026 et 15 partants. Le test live open-pmu-api réalisé sur le 18 août 2026 a renvoyé HTTP 200 et une course avec arrivée. La page LONAB accessible ne contenait pas le 22 septembre au moment de l’exécution ; le code parcourt les liens `rel=next` avant de conclure à l’absence.
