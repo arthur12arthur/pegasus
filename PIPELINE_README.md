@@ -14,7 +14,7 @@ Le nom et la cote sont extraits de manière conservatrice. Une validation métie
 
 ## MarketWatch
 
-`MarketWatch` est un orchestrateur d’adaptateurs gratuits. Il essaie les fournisseurs dans l’ordre donné, s’arrête au premier résultat non vide, calcule le delta relatif et signale toute cote manquante ou tout non-partant. Aucun fournisseur de cotes live n’est activé par défaut dans ce palier : un appelant doit fournir un adaptateur vérifiable. L’API open-pmu-api n’est pas une source de cotes live ; elle sert aux résultats officiels et à l’évaluation J+1.
+`MarketWatch` est un orchestrateur d’adaptateurs gratuits. Il essaie les fournisseurs dans l’ordre donné, s’arrête au premier résultat non vide, calcule le delta relatif et signale toute cote manquante ou tout non-partant. `CanalTurfQuoteProvider` est le premier adaptateur réel : il lit la colonne publique **ZEturf** du tableau HTML Canal Turf. Il reçoit l’URL exacte d’une course déjà identifiée et ne reconstruit aucune URL. Une cellule `--` reste une cote manquante. La fixture `fixtures/canalturf_r1c8_2026-09-23.html` permet de tester le parseur hors réseau. L’API open-pmu-api n’est pas une source de cotes live ; elle sert aux résultats officiels et à l’évaluation J+1.
 
 ## Résultats officiels
 
@@ -28,3 +28,5 @@ python3 -m unittest pegasus_core.test_core -v
 ```
 
 Le test live réalisé le 22 septembre 2026 a récupéré le journal LONAB du 17 septembre 2026 et 15 partants. Le test live open-pmu-api réalisé sur le 18 août 2026 a renvoyé HTTP 200 et une course avec arrivée. La page LONAB accessible ne contenait pas le 22 septembre au moment de l’exécution ; le code parcourt les liens `rel=next` avant de conclure à l’absence.
+
+Le test live du 23 septembre 2026 a appelé la page Canal Turf du 23 septembre, course R1C8, et injecté les cotes 2,7, 4,4 et 20,3 pour les numéros 1, 2 et 18 sans avertissement. Les cotes de sites de paris restent un signal de marché secondaire ; elles ne sont jamais transmises au BaseScorer comme dimension pondérée.

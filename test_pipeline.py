@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import date
 import json
+from pathlib import Path
 import unittest
 from unittest.mock import Mock
 
+from .canalturf_provider import CanalTurfQuoteProvider, parse_canalturf_quotes
 from .discipline import detect_discipline
 from .ingestion import find_journal_link, parse_horses
 from .marketwatch import MarketQuote, MarketWatch, MappingQuoteProvider
@@ -50,6 +52,32 @@ class TestMarketWatch(unittest.TestCase):
         self.assertAlmostEqual(result.deltas_relatives[1], 0.5)
         self.assertEqual(result.missing_numbers, [2])
         self.assertTrue(any("non-partant" in warning for warning in result.warnings))
+
+
+class TestCanalTurfQuoteProvider(unittest.TestCase):
+    FIXTURE = Path(__file__).parent / "fixtures" / "canalturf_r1c8_2026-09-23.html"
+
+    def test_fixture_reelle_extrait_18_cotes_zeturf(self):
+        quotes = parse_canalturf_quotes(self.FIXTURE.read_bytes())
+        self.assertEqual(len(quotes), 18)
+        self.assertEqual(quotes[1].cote, 2.7)
+        self.assertEqual(quotes[3].cote, 84.5)
+        self.assertEqual(quotes[1].source, "CanalTurf/ZEturf")
+
+    def test_provider_alimente_marketwatch_via_requete_http(self):
+        response = Mock(content=self.FIXTURE.read_bytes(), status_code=200)
+        session = Mock()
+        session.get.return_value = response
+        horses = [Horse(1, "TRETIAK", 10.0), Horse(3, "XANTHIS IBIZA", 20.0)]
+        provider = CanalTurfQuoteProvider(
+            "https://www.canalturf.com/pronostics-PMU/2026-09-23/argentan/418606_prix-paristurf-x-pmu.html",
+            session=session,
+        )
+        result = MarketWatch([provider]).update(horses)
+        self.assertEqual(horses[0].cote_actuelle, 2.7)
+        self.assertEqual(horses[1].cote_actuelle, 84.5)
+        self.assertEqual(result.missing_numbers, [])
+        session.get.assert_called_once()
 
 
 class TestOpenPmuApi(unittest.TestCase):
