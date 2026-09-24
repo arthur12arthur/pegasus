@@ -17,6 +17,7 @@ Pegasus est un système explicable d’analyse de la course française relayée 
 | `marketwatch.py` | Orchestrateur des fournisseurs de cotes avant le filtrage |
 | `canalturf_provider.py` | Adaptateur gratuit réel : colonne publique ZEturf de Canal Turf |
 | `geny_provider.py` | Second adaptateur gratuit : rapport probable courant de la page Geny Cotes |
+| `run_pegasus_dry_run.py` | Exécution bout en bout stricte sur une course réelle, avec arrêt sur incohérence |
 | `open_pmu_api.py` | Client gratuit des résultats officiels historiques via open-pmu-api |
 | `test_pipeline.py` | Tests des modules périphériques et de leur intégration |
 | `fixtures/` | Pages HTML Canal Turf et Geny sauvegardées pour tests reproductibles hors réseau |
@@ -69,6 +70,18 @@ result = market.update(horses)  # obligatoire avant apply_filter(...)
 Aucune donnée manquante n’est inventée. Si une source ne fournit pas une cote ou si un cheval est absent de la source actuelle, le champ reste `None` et MarketWatch ajoute un avertissement. `open-pmu-api` fournit des résultats historiques officiels ; il ne remplace pas une source de cote actuelle.
 
 Le système ne produit jamais de conseil de pari ou de mise. Les rapports de production doivent conserver les signatures d’ouverture et de clôture prévues par le Système Prompt Canonique.
+
+## Dry-run réel
+
+Le script `run_pegasus_dry_run.py` enchaîne ingestion LONAB, discipline, MarketWatch Canal Turf, filtre, BaseScorer et consensus. Il exige l’URL exacte de la page de cotes et s’arrête dès qu’une donnée indispensable manque ; il ne remplit donc pas les notes BaseScorer avec les valeurs neutres du modèle.
+
+```bash
+python3 -m pegasus_core.run_pegasus_dry_run \
+  --date 2026-09-24 \
+  --market-url 'https://www.canalturf.com/pronostics-PMU/2026-09-24/compiegne/418641_prix-de-la-basse-automne.html'
+```
+
+Le premier run réel du 24 septembre 2026 a extrait 15 partants, détecté le plat par mots-clés PDF, récupéré 15/15 cotes Canal Turf et retenu les 15 chevaux par le filtre. Il s’est arrêté à BaseScorer car les notes de scoring ne sont pas encore produites par l’ingestion ; aucun score ni classement n’a été présenté comme fonctionnel.
 
 ## Statut de validation
 
