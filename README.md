@@ -1,71 +1,74 @@
-# Pegasus — cœur algorithmique (`pegasus_core`)
+# Pegasus
 
-Ce dossier contient le code écrit et verrouillé par Claude : `filter.py`,
-`scorer.py`, `consensus.py`, `models.py`, `config.py`. Il implémente
-fidèlement les sections 4, 6 et 7 du Système Prompt Canonique (portillon de
-filtrage, score de compétitivité BaseScorer, score de classement Monte
-Carlo/Borda/MetaFusion).
+Pegasus est un système explicable d’analyse de la course française relayée par LONAB/PMU'B pour le marché burkinabè. LONAB est une source relais : les courses analysées se déroulent en France.
 
-## Règle d'or pour Manus (ou toute autre plateforme qui assemble le reste)
+## Organisation du dépôt
 
-**Ne modifiez jamais la logique interne de ces fichiers** (seuils, poids,
-formules, seeds). Importez-les et appelez-les. Si un comportement semble
-incohérent une fois branché sur les vraies données, **signalez-le** plutôt
-que de corriger silencieusement — le contrat est vérifié par
-`test_core.py`, pas par une relecture au cas par cas.
+| Élément | Rôle |
+| --- | --- |
+| `models.py` | Structures de données partagées (`Horse`, résultats de filtrage, scores et classement) |
+| `config.py` | Paramètres numériques figés : pondérations, seuils et seeds |
+| `filter.py` | Portillon binaire d’élimination |
+| `scorer.py` | `BaseScorer`, score de compétitivité par discipline et ferrure au trot |
+| `consensus.py` | Monte Carlo, Borda et MetaFusion pour le score de classement |
+| `test_core.py` | Tests de verrouillage du cœur algorithmique |
+| `ingestion.py` | Localisation du journal LONAB du jour, téléchargement du PDF et extraction conservatrice |
+| `discipline.py` | Détection `trot`, `plat` ou `obstacle` |
+| `marketwatch.py` | Orchestrateur des fournisseurs de cotes avant le filtrage |
+| `canalturf_provider.py` | Adaptateur gratuit réel : colonne publique ZEturf de Canal Turf |
+| `open_pmu_api.py` | Client gratuit des résultats officiels historiques via open-pmu-api |
+| `test_pipeline.py` | Tests des modules périphériques et de leur intégration |
+| `fixtures/` | Page HTML Canal Turf sauvegardée pour tests reproductibles hors réseau |
+| `Hyperion_Systeme_Prompt_Canonique (3).docx` | Source de vérité méthodologique |
+| `Hyperion_Architecture_Unique (3).docx` | Source de vérité architecturale |
+| `PIPELINE_README.md` | Contrat d’utilisation et limites connues des modules périphériques |
 
-Une exception documentée : `consensus.py` reconstruit la formule
-"MetaFusion pairwise" (comparaison de Copeland sur probabilité Monte Carlo
-et score de Borda) car la formule exacte des versions précédentes n'a pas
-été retrouvée. C'est une interprétation raisonnable et déterministe, pas
-une improvisation — mais elle doit être signalée comme telle si on
-retrouve un jour la formule d'origine.
+Le lien symbolique `pegasus_core` conserve l’import historique utilisé par les tests (`python -m unittest pegasus_core.test_core -v`) tout en gardant les fichiers sources visibles à la racine du dépôt.
 
-## Ce que ce code fait (et ne fait pas)
+## Règle absolue du cœur
 
-- `filter.apply_filter(horses)` → portillon binaire (retenu/écarté). Ne
-  renvoie **aucun score**.
-- `scorer.score_group(horses, discipline)` → score de compétitivité
-  (0-10) par cheval retenu, y compris la sous-composante ferrure en trot
-  avec lissage bayésien sur petits échantillons.
-- `consensus.compute_classement(scores)` → classement final (Monte Carlo
-  5 seeds fixes × 10 000 simulations + Borda, fusionnés), avec indicateur
-  de stabilité inter-seeds.
+Les fichiers `models.py`, `config.py`, `filter.py`, `scorer.py` et `consensus.py` sont verrouillés. Le code périphérique les importe et les appelle ; il ne modifie jamais leurs seuils, poids, seeds, formules ou logique interne. Toute incohérence observée sur des données réelles doit être signalée plutôt que corrigée silencieusement.
 
-Ce que ce dossier **ne fait pas** (à la charge du reste du pipeline) :
-ingestion du PDF LONAB, MarketWatch (cotes actuelles), HADES, consensus
-externe (12 sources), indice de confiance final, livraison, stockage.
+Le score de compétitivité produit par `BaseScorer` reste distinct du score de classement produit par le consensus interne. MarketWatch s’exécute avant `apply_filter`, mais les cotes restent un signal de marché secondaire et ne sont pas injectées comme dimension pondérée dans `BaseScorer`.
 
-## Utilisation
+## Installation minimale
 
-```python
-from pegasus_core.filter import apply_filter
-from pegasus_core.scorer import score_group
-from pegasus_core.consensus import compute_classement
+Le projet utilise Python 3.11 ou plus récent et les bibliothèques suivantes : `requests`, `beautifulsoup4` et `pypdf`. L’extraction PDF utilise également `pdftotext` lorsqu’il est disponible, afin de préserver les colonnes des tableaux LONAB.
 
-resultat_filtre = apply_filter(liste_de_chevaux)   # liste de Horse (models.py)
-scores = score_group(resultat_filtre.retenus, "trot")  # "trot" | "plat" | "obstacle"
-classement = compute_classement(scores)
-
-print(classement.classement)        # numéros, du plus probable au moins probable
-print(classement.top3_stable)       # False -> abaisser l'indice de confiance
+```bash
+python -m pip install requests beautifulsoup4 pypdf
 ```
 
 ## Tests
 
 ```bash
 python -m unittest pegasus_core.test_core -v
+python -m unittest pegasus_core.test_pipeline -v
 ```
 
-14 tests, tous verts. Ils verrouillent notamment :
-- le filtrage ne produit jamais de score ;
-- les 5 favoris aux cotes les plus basses sont toujours maintenus ;
-- la taille minimale du groupe filtré est respectée ;
-- les poids de BaseScorer somment à 1 pour chaque discipline ;
-- le lissage bayésien empêche une victoire isolée de dominer le score
-  technique ;
-- le classement est parfaitement reproductible à scores égaux (mêmes
-  seeds → même résultat, à chaque exécution).
+Le cœur contient 14 tests de verrouillage. Les modules périphériques contiennent actuellement 8 tests, dont un test sur fixture Canal Turf et un test d’injection dans MarketWatch.
 
-Si vous ajoutez un module autour de ce cœur et qu'un de ces tests casse,
-c'est le nouveau module qu'il faut corriger — pas le test.
+## Exemple MarketWatch
+
+L’URL Canal Turf doit être fournie par une étape d’identification séparée ; l’adaptateur ne reconstruit pas d’URL et ne fabrique jamais une cote manquante.
+
+```python
+from pegasus_core.canalturf_provider import CanalTurfQuoteProvider
+from pegasus_core.marketwatch import MarketWatch
+
+provider = CanalTurfQuoteProvider(
+    "https://www.canalturf.com/pronostics-PMU/2026-09-23/argentan/418606_prix-paristurf-x-pmu.html"
+)
+market = MarketWatch([provider])
+result = market.update(horses)  # obligatoire avant apply_filter(...)
+```
+
+## Données manquantes et limites
+
+Aucune donnée manquante n’est inventée. Si une source ne fournit pas une cote ou si un cheval est absent de la source actuelle, le champ reste `None` et MarketWatch ajoute un avertissement. `open-pmu-api` fournit des résultats historiques officiels ; il ne remplace pas une source de cote actuelle.
+
+Le système ne produit jamais de conseil de pari ou de mise. Les rapports de production doivent conserver les signatures d’ouverture et de clôture prévues par le Système Prompt Canonique.
+
+## Statut de validation
+
+L’état publié a été testé avec succès : 14 tests du cœur et 8 tests périphériques passent. L’adaptateur Canal Turf a également été exercé contre une page publique réelle et a injecté des cotes pour les partants demandés.
