@@ -8,6 +8,7 @@ from unittest.mock import Mock
 
 from .canalturf_provider import CanalTurfQuoteProvider, parse_canalturf_quotes
 from .discipline import detect_discipline
+from .geny_provider import GenyQuoteProvider, parse_geny_quotes
 from .ingestion import find_journal_link, parse_horses
 from .marketwatch import MarketQuote, MarketWatch, MappingQuoteProvider
 from .models import Horse
@@ -77,6 +78,31 @@ class TestCanalTurfQuoteProvider(unittest.TestCase):
         self.assertEqual(horses[0].cote_actuelle, 2.7)
         self.assertEqual(horses[1].cote_actuelle, 84.5)
         self.assertEqual(result.missing_numbers, [])
+        session.get.assert_called_once()
+
+
+class TestGenyQuoteProvider(unittest.TestCase):
+    FIXTURE = Path(__file__).parent / "fixtures" / "geny_cotes_2026-09-24.html"
+
+    def test_fixture_extrait_les_rapports_probables_et_preserve_manquant(self):
+        quotes = parse_geny_quotes(self.FIXTURE.read_bytes())
+        self.assertEqual(len(quotes), 16)
+        self.assertEqual(quotes[1].cote, 25.1)
+        self.assertEqual(quotes[4].cote, 7.6)
+        self.assertIsNone(quotes[11].cote)
+        self.assertEqual(quotes[1].source, "Geny/rapport-probable")
+
+    def test_provider_alimente_marketwatch_et_signale_cellule_vide(self):
+        response = Mock(content=self.FIXTURE.read_bytes(), status_code=200)
+        session = Mock()
+        session.get.return_value = response
+        horses = [Horse(1, "Kohakou", 10.0), Horse(11, "Caudry", 10.0)]
+        provider = GenyQuoteProvider("https://www.geny.com/cotes", session=session)
+        result = MarketWatch([provider]).update(horses)
+        self.assertEqual(horses[0].cote_actuelle, 25.1)
+        self.assertIsNone(horses[1].cote_actuelle)
+        self.assertEqual(result.missing_numbers, [11])
+        self.assertTrue(any("11" in warning for warning in result.warnings))
         session.get.assert_called_once()
 
 

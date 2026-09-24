@@ -16,9 +16,10 @@ Pegasus est un système explicable d’analyse de la course française relayée 
 | `discipline.py` | Détection `trot`, `plat` ou `obstacle` |
 | `marketwatch.py` | Orchestrateur des fournisseurs de cotes avant le filtrage |
 | `canalturf_provider.py` | Adaptateur gratuit réel : colonne publique ZEturf de Canal Turf |
+| `geny_provider.py` | Second adaptateur gratuit : rapport probable courant de la page Geny Cotes |
 | `open_pmu_api.py` | Client gratuit des résultats officiels historiques via open-pmu-api |
 | `test_pipeline.py` | Tests des modules périphériques et de leur intégration |
-| `fixtures/` | Page HTML Canal Turf sauvegardée pour tests reproductibles hors réseau |
+| `fixtures/` | Pages HTML Canal Turf et Geny sauvegardées pour tests reproductibles hors réseau |
 | `Pegasus_Systeme_Prompt_Canonique.docx` | Source de vérité méthodologique |
 | `Pegasus_Architecture_Unique.docx` | Source de vérité architecturale |
 | `PIPELINE_README.md` | Contrat d’utilisation et limites connues des modules périphériques |
@@ -46,7 +47,7 @@ python -m unittest pegasus_core.test_core -v
 python -m unittest pegasus_core.test_pipeline -v
 ```
 
-Le cœur contient 14 tests de verrouillage. Les modules périphériques contiennent actuellement 8 tests, dont un test sur fixture Canal Turf et un test d’injection dans MarketWatch.
+Le cœur contient 14 tests de verrouillage. Les modules périphériques contiennent actuellement 10 tests, dont des tests sur fixtures Canal Turf et Geny et des tests d’injection dans MarketWatch.
 
 ## Exemple MarketWatch
 
@@ -71,4 +72,4 @@ Le système ne produit jamais de conseil de pari ou de mise. Les rapports de pro
 
 ## Statut de validation
 
-L’état publié a été testé avec succès : 14 tests du cœur et 8 tests périphériques passent. L’adaptateur Canal Turf a également été exercé contre une page publique réelle et a injecté des cotes pour les partants demandés.
+L’état publié a été testé avec succès : 14 tests du cœur et 10 tests périphériques passent. L’adaptateur Canal Turf a été exercé contre une page publique réelle. Le parseur Geny passe sa fixture réelle sauvegardée ; l’accès HTTP Geny peut toutefois renvoyer alternativement une page complète ou une réponse réduite sans tableau, ce qui est signalé et permet le repli MarketWatch.
