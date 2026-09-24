@@ -19,8 +19,8 @@ Pegasus est un système explicable d’analyse de la course française relayée 
 | `open_pmu_api.py` | Client gratuit des résultats officiels historiques via open-pmu-api |
 | `test_pipeline.py` | Tests des modules périphériques et de leur intégration |
 | `fixtures/` | Page HTML Canal Turf sauvegardée pour tests reproductibles hors réseau |
-| `Hyperion_Systeme_Prompt_Canonique (3).docx` | Source de vérité méthodologique |
-| `Hyperion_Architecture_Unique (3).docx` | Source de vérité architecturale |
+| `Pegasus_Systeme_Prompt_Canonique.docx` | Source de vérité méthodologique |
+| `Pegasus_Architecture_Unique.docx` | Source de vérité architecturale |
 | `PIPELINE_README.md` | Contrat d’utilisation et limites connues des modules périphériques |
 
 Le lien symbolique `pegasus_core` conserve l’import historique utilisé par les tests (`python -m unittest pegasus_core.test_core -v`) tout en gardant les fichiers sources visibles à la racine du dépôt.

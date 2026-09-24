@@ -1,6 +1,6 @@
 # Notes de référence — Pegasus/Hyperion
 
-Sources : `hyperion/SKILL.md`, `Hyperion_Architecture_Unique (3).docx`, `Hyperion_Systeme_Prompt_Canonique (3).docx`, README et code du cœur.
+Sources : `hyperion/SKILL.md`, `Pegasus_Architecture_Unique.docx`, `Pegasus_Systeme_Prompt_Canonique.docx`, README et code du cœur.
 
 - LONAB est un relais : la course se déroule en France, jamais au Burkina Faso.
 - Source officielle : ouvrir `https://lonab.bf/programme-pmub`, matcher exactement `journal hippique PMU'B du [date du jour]`, suivre le vrai lien Télécharger ; ne jamais reconstruire l’URL. Pagination si nécessaire.
