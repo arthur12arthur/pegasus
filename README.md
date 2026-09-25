@@ -48,7 +48,9 @@ python -m unittest pegasus_core.test_core -v
 python -m unittest pegasus_core.test_pipeline -v
 ```
 
-Le cœur contient 14 tests de verrouillage. Les modules périphériques contiennent actuellement 10 tests, dont des tests sur fixtures Canal Turf et Geny et des tests d’injection dans MarketWatch.
+L’ingestion expose aussi `IngestionResult.raw_fields`, qui contient par numéro la musique, le driver et le commentaire brut lorsqu’ils sont lisibles, ainsi que `course_distance_raw` et `course_discipline_raw`. Aucune de ces chaînes n’est convertie en note.
+
+Le cœur contient 14 tests de verrouillage. Les modules périphériques contiennent actuellement 11 tests, dont un test des champs bruts, des tests sur fixtures Canal Turf et Geny et des tests d’injection dans MarketWatch.
 
 ## Exemple MarketWatch
 

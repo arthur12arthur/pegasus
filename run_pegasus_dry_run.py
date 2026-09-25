@@ -127,6 +127,18 @@ def main() -> int:
         print(f"  - n°{eliminated.numero} {eliminated.nom} : "
               f"score risque {eliminated.score_risque}; {eliminated.motif}")
 
+    print("\nChamps bruts extraits — retenus, sans interprétation :")
+    print(f"  Distance brute course : {ingestion.course_distance_raw!r}")
+    print(f"  Discipline brute course : {ingestion.course_discipline_raw!r}")
+    for horse in filter_result.retenus:
+        raw = ingestion.raw_fields.get(horse.numero)
+        if raw is None:
+            _stop("4 — champs bruts", f"aucun enregistrement brut pour n°{horse.numero}")
+        print(f"  n°{horse.numero} — champs bruts associés :")
+        print(f"    musique brute      = {raw.musique!r}")
+        print(f"    driver brut        = {raw.driver!r}")
+        print(f"    commentaire brut   = {raw.commentaire!r}")
+
     # Les notes neutres ne doivent pas masquer une absence de données réelles.
     missing_scoring = {
         horse.numero: ingestion.missing_fields.get(horse.numero, [])

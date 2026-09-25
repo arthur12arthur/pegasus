@@ -1,0 +1,92 @@
+Pegasus — exécution dry-run — 2026-09-25T00:31:38+00:00
+Mode : intégration réelle, arrêt strict sur donnée vide/incohérente
+Date demandée : 2026-09-24
+URL MarketWatch fournie explicitement : https://www.canalturf.com/pronostics-PMU/2026-09-24/compiegne/418641_prix-de-la-basse-automne.html
+
+[1/6] Ingestion LONAB/PMU'B
+Journal : journal hippique PMU'B du 24 septembre 2026
+PDF : https://lonab.bf/sites/default/files/2026-09/JH_PMUB_DU_24-09-2026.pdf
+Chevaux extraits : 15
+Numéros : 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16
+
+[2/6] Détection de discipline
+Discipline : plat
+Source : mots-clés PDF; confiance : moyenne
+Avertissement discipline : Champ type absent ou ambigu : repli par mots-clés.
+
+[3/6] MarketWatch — avant filtrage
+Cotes récupérées : 15/15
+Cotes manquantes/non-partants : 0
+Toutes les cotes actuelles sont remplies.
+
+[4/6] Filtrage
+Retenus : 15
+Numéros retenus : 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16
+Écartés : 0
+
+Champs bruts extraits — retenus, sans interprétation :
+  Distance brute course : '1 600 METRES'
+  Discipline brute course : 'PLAT'
+  n°1 — champs bruts associés :
+    musique brute      = '1.1.3.9.3'
+    driver brut        = 'H.BOUTIN'
+    commentaire brut   = "Irréprochable lorsqu'il était sous la\nférule de Tiago Martins, il s'est imposé dans des\nhandicaps pour ses deux premières sorties sous la\nférule de Sandrine Gavilan. Il a été pénalisé de onze\nlivres au total et monte nettement de catégorie. Il\ndevra se surpasser pour espérer finir dans les\ncinq premiers."
+  n°2 — champs bruts associés :
+    musique brute      = '8.5.1.2.2'
+    driver brut        = 'G.TROLLEY DE PREVAUX'
+    commentaire brut   = "Suite à son bon mois de juillet (une victoire\ndans un handicap et une cinquième place dans une\nListed), elle a été remontée de neuf livres sur l'échelle\ndes valeurs. Elle dépend d'un entourage euphorique,\nmais sa tâche se complique très sérieusement.\nSans nous."
+  n°3 — champs bruts associés :
+    musique brute      = '1.2.1.6.9'
+    driver brut        = 'S.PASQUIER'
+    commentaire brut   = "Invaincue en deux essais\ndans les handicaps, cette protégée de Christophe\nFerland doit désormais s'attaquer aux Quinté+. Elle\npossède de bonnes lignes et avait donné une bonne\nréplique à Dalkola (valeur 38) le 19 juillet à Vittel, en lui\nrendant trois livres. Sur cette valeur, elle peut sans\ndoute s'illustrer à ce poids."
+  n°4 — champs bruts associés :
+    musique brute      = '2.1.2.0.5'
+    driver brut        = 'PC.BOUDOT'
+    commentaire brut   = 'Prise en note en tout début de\ncarrière, elle a toutefois dû attendre sa sixième sortie\npublique pour ouvrir son palmarès. Elle vient de montrer\nsa compétitivité en valeur 38 sur le "toboggan" de\nParisLongchamp et les 200 mètres supplémentaires ne\ndevraient pas la contrarier, bien au contraire. Une priorité !'
+  n°5 — champs bruts associés :
+    musique brute      = '0.1.2.7.5'
+    driver brut        = 'C.LECOEUVRE'
+    commentaire brut   = "Délaissée par les parieurs pour son\npremier essai dans les Quinté+, dans la course clé du\n30 août, elle a été desservie par le terrain collant ce\njour-là. Elle présente l'avantage de connaître\nCompiègne, mais sa compétitivité dans les handicaps\nreste à démontrer. Affaire d'impression."
+  n°6 — champs bruts associés :
+    musique brute      = '1.3.3.9'
+    driver brut        = 'M.GUYON'
+    commentaire brut   = "Cette représentante des frères\nWertheimer ne cesse de progresser et vient d'ouvrir son\npalmarès à la lutte à Clairefontaine. Elle débute dans\nles handicaps et affronte les mâles pour la première fois,\nmais elle connaît Compiègne et n'a sans doute pas\nencore tout montré. A retenir."
+  n°7 — champs bruts associés :
+    musique brute      = '3.5.7.1.3'
+    driver brut        = 'M.GRANDIN'
+    commentaire brut   = "Chuchoté pour ses débuts dans les\nQuinté+, le 30 août à Deauville, il a fourni une belle\nvaleur (3e). Les données changent, mais il a déjà gagné\nen bon terrain et à Compiègne. À l'issue d'un parcours\nsans encombre, il devrait donc répondre présent."
+  n°8 — champs bruts associés :
+    musique brute      = '4.1.5.2.2'
+    driver brut        = 'A.POUCHIN'
+    commentaire brut   = "Elle n'a jamais déçu en deux\nessais sur ce parcours (1re et 2e) et a fourni un\nexcellent effort final dans l'épreuve clé (4e), alors qu'elle\nn'était pas dans la bonne portion de piste. Elle est très\ncompétitive à cette valeur et constitue un solide\npoint d'appui."
+  n°9 — champs bruts associés :
+    musique brute      = '0.7.1.2'
+    driver brut        = 'S.CHUETTE'
+    commentaire brut   = "Après une réapparition victorieuse à\nSaint-Cloud, le 5 mai, elle nous a déçus à deux reprises.\nSes débuts dans les Quinté+ n'ont pas été concluants\n(13e) et elle aurait préféré une piste bien plus souple.\nD'autres protagonistes lui sont préférables."
+  n°10 — champs bruts associés :
+    musique brute      = '2.2.9.4.5'
+    driver brut        = 'M.BARZALONA'
+    commentaire brut   = 'Castré au printemps, ce fils'
+  n°12 — champs bruts associés :
+    musique brute      = '1.5.1.2.1'
+    driver brut        = 'D.PROVOST'
+    commentaire brut   = "Impressionnant lauréat d'un"
+  n°13 — champs bruts associés :
+    musique brute      = '0.3.1.4.2'
+    driver brut        = 'C.DEMURO'
+    commentaire brut   = 'Troisième pour ses débuts\ndans les gros handicaps, le 13 août sur la PSF\ndeauvillaise, il a ensuite été rebuté par le terrain\ncollant dans la course clé (14e). Il retrouve le parcours\nde son unique succès et pourra rapidement occuper\nles avant-postes avec la corde 6. À reprendre.'
+  n°14 — champs bruts associés :
+    musique brute      = '1.6.3.0.8'
+    driver brut        = 'C.SOUMILLON'
+    commentaire brut   = 'Soigneusement préparé\npour les handicaps, cet élève de Vincent Sartori a'
+  n°15 — champs bruts associés :
+    musique brute      = '0.0.9.8.5'
+    driver brut        = 'R.MANGIONE'
+    commentaire brut   = "Ce hongre évoluait sur une\ndistance trop longue pour lui en dernier lieu et ne doit\npas être jugé sur cet échec. Sa valeur a fondu et il\nest bien situé en bas de tableau. Jugé sur\nd'anciennes valeurs, il a son mot à dire dans un tel"
+  n°16 — champs bruts associés :
+    musique brute      = '4.3.2.1.4'
+    driver brut        = 'A.HAMELIN'
+    commentaire brut   = "Il ne cesse de se distinguer dans les\ngros handicaps et a déjà brillé sur le tracé spécial\nde Compiègne. Il s'adapte à tous les terrains et a"
+
+ARRÊT INTÉGRATION — étape 5 — BaseScorer
+Motif exact : données de scoring manquantes pour les retenus ; refus d’exécuter sur valeurs neutres : {1: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 2: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 3: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 4: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 5: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 6: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 7: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 8: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 9: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 10: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 12: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 13: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 14: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 15: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé'], 16: ['cote_actuelle (MarketWatch non exécuté)', 'notes BaseScorer', 'ferrure_stats / historique ferrure', 'non-partant actualisé']}

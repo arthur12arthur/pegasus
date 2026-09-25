@@ -8,7 +8,7 @@ Ces modules entourent le cœur verrouillé (`models.py`, `config.py`, `filter.py
 
 ## Extraction et données manquantes
 
-L’extraction déterministe s’appuie sur `pypdf` et le repli `pdftotext -layout`, particulièrement utile pour les tableaux de partants LONAB. Les champs effectivement lisibles dans le PDF sont les numéros, noms, gains et première cote imprimée dans la colonne officielle du document. Les notes BaseScorer, l’historique ferrure et la cote actuelle ne sont pas inventés : ils restent neutres/`None` conformément au contrat et sont inscrits dans `missing_fields` ou les avertissements du résultat.
+L’extraction déterministe s’appuie sur `pypdf` et le repli `pdftotext -layout`, particulièrement utile pour les tableaux de partants LONAB. Les champs effectivement lisibles dans le PDF sont les numéros, noms, gains, première cote imprimée, musique et driver. `IngestionResult.raw_fields` expose par numéro ces chaînes brutes ainsi que le commentaire officiel quand son rattachement aux colonnes est suffisamment fiable ; `course_distance_raw` et `course_discipline_raw` exposent les libellés de course bruts. Les notes BaseScorer, l’historique ferrure et la cote actuelle ne sont pas inventés : ils restent neutres/`None` conformément au contrat et sont inscrits dans `missing_fields` ou les avertissements du résultat.
 
 Le nom et la cote sont extraits de manière conservatrice. Une validation métier reste nécessaire avant production si un nouveau gabarit PDF apparaît. Le module ne transforme pas automatiquement les commentaires narratifs en notes historiques ou forme, car cela introduirait une donnée non vérifiée.
 
@@ -36,3 +36,5 @@ Le test live du 23 septembre 2026 a appelé la page Canal Turf du 23 septembre, 
 La fixture Geny du 24 septembre 2026 contient 16 partants et a été extraite avec succès par le nouveau parseur, y compris la conservation explicite de la cellule manquante du n°11. Lors du smoke test direct suivant, Geny a alternativement renvoyé la page complète puis une réponse réduite sans tableau ; dans ce dernier cas, l’adaptateur lève une erreur contrôlée et MarketWatch peut passer au fournisseur suivant. Ce comportement intermittent reste à surveiller avant une dépendance exclusive à Geny.
 
 Le dry-run réel du 24 septembre 2026 a extrait 15 partants depuis le journal LONAB, détecté `plat` par mots-clés PDF avec confiance moyenne, récupéré 15/15 cotes Canal Turf et retenu les 15 chevaux. Il s’est arrêté à l’étape BaseScorer, car `ingestion.py` ne fournit pas encore les notes BaseScorer ; aucun score de compétitivité ni classement de consensus n’a été exécuté ou présenté.
+
+Pour les commentaires en mise en page multi-colonnes, le parseur conserve les retours à la ligne du PDF et exclut les fragments latéraux ou de résultats lorsqu’ils sont détectables. Une valeur absente ou un rattachement ambigu reste `None` plutôt que d’être complété.

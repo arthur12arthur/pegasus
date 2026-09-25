@@ -9,7 +9,7 @@ from unittest.mock import Mock
 from .canalturf_provider import CanalTurfQuoteProvider, parse_canalturf_quotes
 from .discipline import detect_discipline
 from .geny_provider import GenyQuoteProvider, parse_geny_quotes
-from .ingestion import find_journal_link, parse_horses
+from .ingestion import extract_raw_fields, find_journal_link, parse_horses
 from .marketwatch import MarketQuote, MarketWatch, MappingQuoteProvider
 from .models import Horse
 from .open_pmu_api import OpenPmuApiClient
@@ -34,6 +34,20 @@ class TestIngestion(unittest.TestCase):
         self.assertEqual(horses[0].note_forme, 0.0)
         self.assertIn("notes BaseScorer", missing[1])
         self.assertFalse(warnings)
+
+    def test_champs_bruts_musique_driver_commentaire_sans_note(self):
+        text = (
+            "1 - CHEVAL TEST : Texte officiel brut, à conserver.\n"
+            "N°     CHEVAUX         JOCKEYS           ENTRAINEURS     PROPRIETAIRES SEXE CORDE POIDS PERF. GAINS\n"
+            "01 CHEVAL TEST       J.DOE            T.TRAINER       OWNER         H.3   7    60.KG 1.2.3.4.5   10 000  12/1\n"
+        )
+        horses, _, _ = parse_horses(text)
+        raw, distance, discipline = extract_raw_fields(text, horses)
+        self.assertEqual(raw[1].musique, "1.2.3.4.5")
+        self.assertEqual(raw[1].driver, "J.DOE")
+        self.assertEqual(raw[1].commentaire, "Texte officiel brut, à conserver.")
+        self.assertIsNone(distance)
+        self.assertIsNone(discipline)
 
 
 class TestDiscipline(unittest.TestCase):

@@ -39,6 +39,19 @@ class IngestionResult:
     horses: list[Horse]
     missing_fields: dict[int, list[str]] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    raw_fields: dict[int, "RawHorseFields"] = field(default_factory=dict)
+    course_distance_raw: str | None = None
+    course_discipline_raw: str | None = None
+
+
+@dataclass(frozen=True)
+class RawHorseFields:
+    """Texte extrait du PDF, sans conversion en note ni interprétation."""
+
+    musique: str | None = None
+    driver: str | None = None
+    commentaire: str | None = None
+    raw_line: str | None = None
 
 
 def _french_months() -> dict[str, int]:
@@ -99,6 +112,19 @@ _GAINS_ODDS = re.compile(
     r"(?<![\d.])(?P<gains>\d{1,3}(?: \d{3})?)\s{2,}"
     r"(?P<odds>\d+(?:[.,]\d+)?)/1"
 )
+_MUSIC = re.compile(r"(?<![\d.])\d+(?:\.\d+){2,}(?![\d.])")
+_DRIVER_TOKEN = re.compile(r"(?<![A-ZÀ-ÖØ-Ý])(?:[A-Z&]{1,4}\.)+[A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý&'-]*")
+_COMMENT_START = re.compile(
+    r"(?<!\S)(?P<num>\d{1,2})\s+-\s+"
+    r"(?P<name>[A-ZÀ-ÖØ-Ý][A-ZÀ-ÖØ-Ý'& ]*?)\s*:\s*(?P<text>.*)"
+)
+_COMMENT_STOP_MARKERS = (
+    "RESULTATS DES COURSES", "SUITE DE L’ARRIVÉE", "SUITE DE L'ARRIVEE",
+    "JOURNAL HIPPIQUE", '"QUARTE"', "QUARTE DU", "POUR SON PREMIER ESSAI",
+    "16 CONCURRENTS", "ARRIVEE DU", "- ARRIVEE", "- NPO", "AN XXV",
+    "NUMÉROS CLIENTÈLE", "NUMEROS CLIENTELE", "52 800", "PARIS TURF",
+    "COUPLÉ", "COUPLE", "BONUS", "MASSE À PARTAGER", "MASSE A PARTAGER",
+)
 
 
 def _horse_from_line(line: str) -> Horse | None:
@@ -148,6 +174,107 @@ def parse_horses(text: str) -> tuple[list[Horse], dict[int, list[str]], list[str
     return horses, missing, warnings
 
 
+def extract_raw_fields(text: str, horses: list[Horse]) -> tuple[dict[int, RawHorseFields], str | None, str | None]:
+    """Expose les colonnes et commentaires lisibles, sans les noter.
+
+    Les positions de colonnes sont prises dans l'en-tête du PDF lorsqu'il est
+    présent. Les continuations sont conservées dans la même colonne physique ;
+    les séparateurs de colonnes voisines et les tableaux de résultats sont
+    exclus lorsqu’ils sont détectables.
+    """
+    numbers = {horse.numero for horse in horses}
+    lines = text.splitlines()
+    header_index = next(
+        (i for i, line in enumerate(lines)
+         if "CHEVAUX" in line and "JOCKEYS" in line and "PERF." in line),
+        None,
+    )
+    raw: dict[int, RawHorseFields] = {}
+    if header_index is not None:
+        for line in lines[header_index + 1:]:
+            match = re.match(r"^\s*(?P<num>\d{1,2})\s+", line)
+            if not match:
+                continue
+            number = int(match.group("num"))
+            if number not in numbers:
+                continue
+            if number in raw:
+                continue
+            music_match = _MUSIC.search(line)
+            driver: str | None = None
+            driver_matches = list(_DRIVER_TOKEN.finditer(line[3:]))
+            if len(driver_matches) >= 2:
+                first, second = driver_matches[0], driver_matches[1]
+                value = line[3 + first.start():3 + second.start()].strip()
+                driver = value or None
+            raw[number] = RawHorseFields(
+                musique=music_match.group(0) if music_match else None,
+                driver=driver,
+                raw_line=line.rstrip() or None,
+            )
+            if number == max(numbers) and len(raw) == len(numbers):
+                break
+
+    comments: dict[int, str] = {}
+    active: list[int | None] = [None, None]
+    narrative_lines = lines[:header_index] if header_index is not None else []
+    for line in narrative_lines:
+        for column, segment in enumerate((line[:65], line[65:130])):
+            stripped = segment.strip()
+            start = _COMMENT_START.search(segment)
+            if start:
+                number = int(start.group("num"))
+                active[column] = number if number in numbers else None
+                if number in numbers:
+                    body = start.group("text").rstrip()
+                    body = re.split(r"\s{2,}", body, maxsplit=1)[0].rstrip()
+                    marker_positions = [body.upper().find(marker) for marker in _COMMENT_STOP_MARKERS
+                                        if body.upper().find(marker) >= 0]
+                    if marker_positions:
+                        body = body[:min(marker_positions)].rstrip()
+                        active[column] = None
+                    comments[number] = body
+                continue
+            upper = stripped.upper()
+            stop = any(marker in upper for marker in _COMMENT_STOP_MARKERS)
+            stop = stop or bool(re.search(r"\b(?:52|ARRIV[ÉE]E|TOMBÉ|ARRÊTÉ|DISQUALIFIÉ)\b", upper))
+            if stop:
+                active[column] = None
+                continue
+            number = active[column]
+            if number is not None and stripped:
+                fragment = re.split(r"\s{2,}", stripped, maxsplit=1)[0].rstrip()
+                if (fragment.startswith("-") or len(fragment) <= 4 or
+                        fragment.upper().startswith("DE L'") or
+                        fragment.upper().startswith(("RECTEUR DE", "BLICITÉ", "NUMÉROS CLIENT"))):
+                    active[column] = None
+                    continue
+                if fragment:
+                    comments[number] = (comments.get(number, "") + "\n" + fragment).strip()
+
+    for number, fields in raw.items():
+        raw[number] = RawHorseFields(
+            musique=fields.musique,
+            driver=fields.driver,
+            commentaire=comments.get(number),
+            raw_line=fields.raw_line,
+        )
+    for number in numbers - raw.keys():
+        raw[number] = RawHorseFields(commentaire=comments.get(number))
+
+    distance_match = re.search(r"\b\d[\d ]*\s+METRES\b", text, re.I)
+    discipline_match = re.search(
+        r"\d+\s+CONCURRENTS[^\n]*?\b(PLAT|TROT(?: ATTELÉ| MONTÉ)?|HAIES|STEEPLE)\b",
+        text,
+        re.I,
+    )
+    return (
+        raw,
+        distance_match.group(0).strip() if distance_match else None,
+        discipline_match.group(1) if discipline_match else None,
+    )
+
+
 class LonabIngestion:
     def __init__(self, session: requests.Session | None = None, timeout: float = 20.0):
         self.session = session or requests.Session()
@@ -175,7 +302,18 @@ class LonabIngestion:
         content = pdf.content
         text = extract_pdf_text(content)
         horses, missing, warnings = parse_horses(text)
-        return IngestionResult(journal, content, text, horses, missing, warnings)
+        raw_fields, distance_raw, discipline_raw = extract_raw_fields(text, horses)
+        return IngestionResult(
+            journal=journal,
+            pdf_bytes=content,
+            text=text,
+            horses=horses,
+            missing_fields=missing,
+            warnings=warnings,
+            raw_fields=raw_fields,
+            course_distance_raw=distance_raw,
+            course_discipline_raw=discipline_raw,
+        )
 
     def save_pdf(self, result: IngestionResult, destination: str | Path) -> Path:
         path = Path(destination)
