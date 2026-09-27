@@ -19,9 +19,10 @@ from .canalturf_provider import CanalTurfQuoteProvider
 from .consensus import compute_classement
 from .discipline import detect_discipline
 from .filter import apply_filter
-from .ingestion import LonabIngestion
+from .ingestion import IngestionResult, LonabIngestion
 from .marketwatch import MarketWatch
 from .scorer import score_group
+from .assembly import construire_horses
 
 
 def _print_header() -> None:
@@ -139,24 +140,40 @@ def main() -> int:
         print(f"    driver brut        = {raw.driver!r}")
         print(f"    commentaire brut   = {raw.commentaire!r}")
 
-    # Les notes neutres ne doivent pas masquer une absence de données réelles.
-    missing_scoring = {
-        horse.numero: ingestion.missing_fields.get(horse.numero, [])
-        for horse in filter_result.retenus
-        if any(field in {"notes BaseScorer", "ferrure_stats / historique ferrure"}
-               for field in ingestion.missing_fields.get(horse.numero, []))
-    }
-    if missing_scoring:
+    # Notes de scoring : construites à partir des champs bruts (musique,
+    # gains, commentaire) via notation.py + signal_textuel.py — jamais de
+    # valeur neutre non signalée. Seules les dimensions structurellement
+    # impossibles à obtenir bloquent l'exécution (cote_actuelle, historique/
+    # forme sans données brutes, ferrure manquante en trot) ; aptitude et
+    # fraîcheur retombent sur un repli neutre documenté quand le commentaire
+    # ne contient pas de signal fiable — non bloquant, comme le repli déjà
+    # utilisé par scorer.py pour driver_config_note.
+    ingestion_retenus = IngestionResult(
+        journal=ingestion.journal, pdf_bytes=ingestion.pdf_bytes, text=ingestion.text,
+        horses=filter_result.retenus, missing_fields=ingestion.missing_fields,
+        warnings=ingestion.warnings, raw_fields=ingestion.raw_fields,
+        course_distance_raw=ingestion.course_distance_raw,
+        course_discipline_raw=ingestion.course_discipline_raw,
+    )
+    cotes_actuelles = {h.numero: h.cote_actuelle for h in filter_result.retenus}
+    assembly_result = construire_horses(ingestion_retenus, cotes_actuelles, detection.discipline)
+
+    if assembly_result.missing_fields:
+        print("\nDimensions en repli neutre (non bloquant, tracé pour le rapport) :")
+        for numero, champs in assembly_result.missing_fields.items():
+            print(f"  n°{numero} : {'; '.join(champs)}")
+
+    if assembly_result.bloquant:
         _stop(
             "5 — BaseScorer",
-            "données de scoring manquantes pour les retenus ; refus d’exécuter "
-            f"sur valeurs neutres : {missing_scoring}",
+            "données de scoring structurellement manquantes pour les retenus : "
+            f"{assembly_result.bloquant}",
         )
 
     # 5. Score de compétitivité.
     print("\n[5/6] BaseScorer")
     try:
-        scores = score_group(filter_result.retenus, detection.discipline)
+        scores = score_group(assembly_result.horses, detection.discipline)
     except Exception as exc:
         _stop("5 — BaseScorer", f"{type(exc).__name__}: {exc}")
     if len(scores) != len(filter_result.retenus):
