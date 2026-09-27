@@ -19,6 +19,7 @@ from .canalturf_provider import CanalTurfQuoteProvider
 from .consensus import compute_classement
 from .discipline import detect_discipline
 from .filter import apply_filter
+from .geny_provider import GenyQuoteProvider
 from .ingestion import IngestionResult, LonabIngestion
 from .marketwatch import MarketWatch
 from .scorer import score_group
@@ -43,6 +44,9 @@ def _parse_args() -> argparse.Namespace:
                         help="date ISO du journal LONAB (défaut : date système)")
     parser.add_argument("--market-url", required=True,
                         help="URL exacte de la page Canal Turf de la course")
+    parser.add_argument("--geny-url", default=None,
+                        help="URL exacte de la page Geny (rapports probables) — "
+                             "recours si Canal Turf échoue ou renvoie une cote absente")
     return parser.parse_args()
 
 
@@ -86,12 +90,16 @@ def main() -> int:
     for warning in detection.warnings:
         print(f"Avertissement discipline : {warning}")
 
-    # 3. MarketWatch obligatoire avant le filtre.
+    # 3. MarketWatch obligatoire avant le filtre. Canal Turf en source
+    # principale, Geny en recours si fourni — deux fournisseurs
+    # indépendants, comme le prévoit l'orchestrateur MarketWatch (essaie
+    # dans l'ordre, s'arrête au premier résultat non vide).
     print("\n[3/6] MarketWatch — avant filtrage")
+    providers = [CanalTurfQuoteProvider(args.market_url)]
+    if args.geny_url:
+        providers.append(GenyQuoteProvider(args.geny_url))
     try:
-        market_result = MarketWatch([
-            CanalTurfQuoteProvider(args.market_url),
-        ]).update(ingestion.horses)
+        market_result = MarketWatch(providers).update(ingestion.horses)
     except Exception as exc:
         _stop("3 — MarketWatch", f"{type(exc).__name__}: {exc}")
     recovered = sum(

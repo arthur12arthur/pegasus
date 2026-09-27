@@ -1,0 +1,62 @@
+name: Dry-run Pegasus (manuel)
+
+# Lance run_pegasus_dry_run.py pour de vrai, avec un accès réseau réel
+# (LONAB, Canal Turf, Geny) — chose que l'environnement de développement
+# habituel n'a pas. Déclenchement manuel uniquement (bouton "Run workflow"
+# dans l'onglet Actions de GitHub) : PAS de cron, volontairement. Le
+# système n'est pas encore prêt pour une exécution quotidienne automatique
+# (pas de HADES, pas de consensus externe, pas de livraison/signature) —
+# voir Système Prompt Canonique, section 13. Automatiser maintenant
+# masquerait des lacunes réelles derrière une fausse impression de
+# système en production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Date ISO du journal LONAB (ex. 2026-09-26). Vide = aujourd'hui."
+        required: false
+        default: ""
+      market_url:
+        description: "URL exacte de la page Canal Turf de la course (obligatoire)"
+        required: true
+      geny_url:
+        description: "URL exacte de la page Geny — recours si Canal Turf échoue (optionnel)"
+        required: false
+        default: ""
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          path: pegasus_core
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r pegasus_core/requirements.txt
+
+      - name: Lancer le dry-run réel
+        run: |
+          ARGS="--market-url '${{ inputs.market_url }}'"
+          if [ -n "${{ inputs.date }}" ]; then
+            ARGS="$ARGS --date ${{ inputs.date }}"
+          fi
+          if [ -n "${{ inputs.geny_url }}" ]; then
+            ARGS="$ARGS --geny-url '${{ inputs.geny_url }}'"
+          fi
+          eval python -m pegasus_core.run_pegasus_dry_run $ARGS | tee dry_run_output.txt
+
+      - name: Conserver la sortie complète (visible 90 jours dans l'onglet Actions)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pegasus-dry-run-output
+          path: dry_run_output.txt
+          retention-days: 90

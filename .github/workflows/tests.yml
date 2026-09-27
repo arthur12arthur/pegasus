@@ -1,0 +1,42 @@
+name: Tests
+
+# Protège le cœur verrouillé et tout le reste : tourne sur chaque push et
+# chaque pull request vers master. Ne pousse ni ne modifie rien — lecture
+# seule, aucune donnée externe requise (les tests utilisent des fixtures
+# locales, jamais un accès réseau réel).
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch: {}
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      # Dossier nommé pegasus_core pour que les imports relatifs
+      # "from . import ..." utilisés partout dans le code fonctionnent
+      # exactement comme en local.
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          path: pegasus_core
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r pegasus_core/requirements.txt
+
+      - name: Exécuter la suite de tests complète
+        run: |
+          python -m unittest \
+            pegasus_core.test_core \
+            pegasus_core.test_pipeline \
+            pegasus_core.test_notation \
+            pegasus_core.test_signal_textuel \
+            -v
