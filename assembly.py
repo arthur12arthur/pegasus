@@ -45,10 +45,11 @@ def construire_horses(
     partir des champs bruts exposés par ingestion.py.
 
     discipline : "trot" | "plat" | "obstacle" — pour savoir si
-    ferrure_stats est réellement requis (trot uniquement).
+    la discipline courante ; seul le trot trace l'absence de ferrure_stats.
     """
     musiques = {n: rf.musique for n, rf in ingestion.raw_fields.items()}
-    gains = {h.numero: (h.gains_euros if h.gains_euros else None) for h in ingestion.horses}
+    # 0 € de gains est une donnée réelle (débutant) ; seule l'absence (None) est un manque.
+    gains = {h.numero: h.gains_euros for h in ingestion.horses}
 
     notes = calculer_notes(musiques, gains)
 
@@ -95,11 +96,15 @@ def construire_horses(
             manquants.append("cote_actuelle (MarketWatch non fourni pour ce cheval)")
             bloquants_horse.append("cote_actuelle")
 
-        # --- ferrure : bloquant seulement en trot (scorer.py gère déjà le
-        # repli neutre pour plat/obstacle via note_technique fourni ou None)
+        # --- ferrure (trot) : NON bloquant. scorer.py applique déjà un repli
+        # neutre (5.0) quand ferrure_stats est absent, testé dans test_core.py.
+        # On le trace pour le rapport (Laboratoire interne) sans arrêter le
+        # pipeline — sinon aucune course de trot ne pourrait jamais tourner,
+        # puisque l'ingestion n'extrait pas encore l'historique de ferrure.
         if discipline == "trot" and horse.ferrure_stats is None:
-            manquants.append("ferrure_stats / historique ferrure (requis en trot)")
-            bloquants_horse.append("ferrure_stats")
+            manquants.append(
+                "ferrure_stats / historique ferrure absent — technique en repli neutre (trot)"
+            )
 
         horses.append(
             Horse(

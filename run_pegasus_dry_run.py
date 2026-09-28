@@ -2,12 +2,17 @@
 
 Le script ne fabrique aucune donnée et ne modifie aucun module du cœur. Il
 s'arrête dès qu'une étape est vide, incohérente ou qu'une donnée indispensable
-reste manquante. L'URL de marché doit être fournie explicitement : elle vient
-d'une identification séparée de la course et n'est jamais reconstruite ici.
+reste manquante.
 
-Exemple (course principale du 24/09/2026) :
-    python3 run_pegasus_dry_run.py \
-      --market-url 'https://www.canalturf.com/pronostics-PMU/2026-09-24/compiegne/418641_prix-de-la-basse-automne.html'
+Le lien Canal Turf de la course est retrouvé automatiquement à partir de
+l'en-tête du journal LONAB (hippodrome + nom de la course, voir
+url_discovery.py). Si la correspondance est absente ou ambiguë, le script
+s'arrête plutôt que de deviner. --market-url permet de forcer un lien.
+
+Exemples (depuis le dossier parent du dépôt) :
+    python -m pegasus_core.run_pegasus_dry_run
+    python -m pegasus_core.run_pegasus_dry_run --date 2026-09-24
+    python -m pegasus_core.run_pegasus_dry_run --market-url 'https://www.canalturf.com/...'
 """
 from __future__ import annotations
 
@@ -23,6 +28,7 @@ from .geny_provider import GenyQuoteProvider
 from .ingestion import IngestionResult, LonabIngestion
 from .marketwatch import MarketWatch
 from .scorer import score_group
+from .url_discovery import DecouverteError, discover_canalturf_url, parse_course_header
 from .assembly import construire_horses
 
 
@@ -42,8 +48,11 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--date", type=date.fromisoformat, default=date.today(),
                         help="date ISO du journal LONAB (défaut : date système)")
-    parser.add_argument("--market-url", required=True,
-                        help="URL exacte de la page Canal Turf de la course")
+    parser.add_argument("--market-url", default=None,
+                        help="URL exacte de la page Canal Turf de la course. "
+                             "Optionnelle : si absente, Pegasus la retrouve "
+                             "automatiquement à partir de l'en-tête du journal LONAB "
+                             "(hippodrome + nom de la course). Si fournie, elle prime.")
     parser.add_argument("--geny-url", default=None,
                         help="URL exacte de la page Geny (rapports probables) — "
                              "recours si Canal Turf échoue ou renvoie une cote absente")
@@ -54,7 +63,7 @@ def main() -> int:
     args = _parse_args()
     _print_header()
     print(f"Date demandée : {args.date.isoformat()}")
-    print(f"URL MarketWatch fournie explicitement : {args.market_url}")
+    print(f"URL MarketWatch fournie explicitement : {args.market_url or '(aucune — découverte automatique)'}")
 
     # 1. Ingestion officielle LONAB.
     print("\n[1/6] Ingestion LONAB/PMU'B")
@@ -90,12 +99,32 @@ def main() -> int:
     for warning in detection.warnings:
         print(f"Avertissement discipline : {warning}")
 
+    # 2b. Lien Canal Turf : fourni à la main, sinon retrouvé automatiquement.
+    market_url = args.market_url
+    if market_url:
+        print("\n[2b] Lien Canal Turf : fourni explicitement (aucune découverte)")
+    else:
+        print("\n[2b] Découverte automatique du lien Canal Turf")
+        try:
+            header = parse_course_header(ingestion.text)
+            print(f"En-tête LONAB : {header.hippodrome} — {header.nom_course} "
+                  f"({header.nb_concurrents} concurrents, {header.discipline_brute}, "
+                  f"{header.distance_metres} m)")
+            decouverte = discover_canalturf_url(header, ingestion.journal.journal_date)
+        except DecouverteError as exc:
+            _stop("2b — découverte du lien Canal Turf",
+                  f"{exc}  ->  relancer avec --market-url pour passer outre.")
+        market_url = decouverte.race.url
+        print(f"Course retrouvée ({decouverte.methode}) : {market_url}")
+        for avertissement in decouverte.avertissements:
+            print(f"Avertissement découverte : {avertissement}")
+
     # 3. MarketWatch obligatoire avant le filtre. Canal Turf en source
     # principale, Geny en recours si fourni — deux fournisseurs
     # indépendants, comme le prévoit l'orchestrateur MarketWatch (essaie
     # dans l'ordre, s'arrête au premier résultat non vide).
     print("\n[3/6] MarketWatch — avant filtrage")
-    providers = [CanalTurfQuoteProvider(args.market_url)]
+    providers = [CanalTurfQuoteProvider(market_url)]
     if args.geny_url:
         providers.append(GenyQuoteProvider(args.geny_url))
     try:
