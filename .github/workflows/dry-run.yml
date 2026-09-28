@@ -18,8 +18,9 @@ on:
         required: false
         default: ""
       market_url:
-        description: "URL exacte de la page Canal Turf de la course (obligatoire)"
-        required: true
+        description: "URL Canal Turf (optionnel — laissez vide, Pegasus la retrouve seul à partir du journal LONAB)"
+        required: false
+        default: ""
       geny_url:
         description: "URL exacte de la page Geny — recours si Canal Turf échoue (optionnel)"
         required: false
@@ -44,7 +45,10 @@ jobs:
 
       - name: Lancer le dry-run réel
         run: |
-          ARGS="--market-url '${{ inputs.market_url }}'"
+          ARGS=""
+          if [ -n "${{ inputs.market_url }}" ]; then
+            ARGS="$ARGS --market-url '${{ inputs.market_url }}'"
+          fi
           if [ -n "${{ inputs.date }}" ]; then
             ARGS="$ARGS --date ${{ inputs.date }}"
           fi
