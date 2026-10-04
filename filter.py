@@ -12,6 +12,17 @@ from . import config
 from .models import EliminatedHorse, FilterResult, Horse
 
 
+def _cote_reference(horse: Horse) -> float | None:
+    """
+    Cote à utiliser pour le seuil "cote extrême" et la règle des favoris
+    forcés : la cote du PDF si elle est connue, sinon la cote actuelle
+    (MarketWatch, qui s'exécute avant le filtrage — voir Système Prompt
+    Canonique section 5). Jamais une valeur inventée : si aucune des deux
+    n'est connue, None est propagé tel quel.
+    """
+    return horse.cote_pdf if horse.cote_pdf is not None else horse.cote_actuelle
+
+
 def _score_risque(horse: Horse, seuil_cote_extreme: float) -> tuple[int, list[str]]:
     """Calcule le score de risque d'un cheval et la liste des motifs déclenchés.
 
@@ -22,7 +33,10 @@ def _score_risque(horse: Horse, seuil_cote_extreme: float) -> tuple[int, list[st
     score = 0
     motifs: list[str] = []
 
-    if horse.gains_euros <= 0:
+    # gains_euros/cote_pdf peuvent être None (donnée non déterminée à
+    # l'extraction — jamais inventée, voir ingestion.py) : le critère
+    # correspondant est alors simplement ignoré, pas évalué à tort.
+    if horse.gains_euros is not None and horse.gains_euros <= 0:
         score += config.RISK_POINTS["gains_insuffisants"]
         motifs.append("gains insuffisants")
 
@@ -30,9 +44,10 @@ def _score_risque(horse: Horse, seuil_cote_extreme: float) -> tuple[int, list[st
         score += config.RISK_POINTS["forme_catastrophique"]
         motifs.append(f"{horse.disqualifications_recentes} disqualifications récentes")
 
-    if horse.cote_pdf >= seuil_cote_extreme:
+    cote_ref = _cote_reference(horse)
+    if cote_ref is not None and cote_ref >= seuil_cote_extreme:
         score += config.RISK_POINTS["cote_extreme"]
-        motifs.append(f"cote extrême ({horse.cote_pdf}/1)")
+        motifs.append(f"cote extrême ({cote_ref}/1)")
 
     if horse.courses_sans_rentree_jours is not None and horse.courses_sans_rentree_jours > 180:
         score += config.RISK_POINTS["absence_prolongee"]
@@ -42,7 +57,7 @@ def _score_risque(horse: Horse, seuil_cote_extreme: float) -> tuple[int, list[st
         score += config.RISK_POINTS["surclassement_signale"]
         motifs.append("surclassement signalé par le commentaire officiel")
 
-    if horse.cote_actuelle is not None and horse.cote_pdf > 0:
+    if horse.cote_actuelle is not None and horse.cote_pdf is not None and horse.cote_pdf > 0:
         hausse_relative = (horse.cote_actuelle - horse.cote_pdf) / horse.cote_pdf
         if hausse_relative >= 1.0:  # cote au moins doublée depuis le PDF
             score += config.RISK_POINTS["delta_cote_hausse_forte"]
@@ -67,8 +82,14 @@ def apply_filter(
         raise ValueError("apply_filter: la liste de partants est vide")
 
     if seuil_cote_extreme is None:
-        cotes_triees = sorted(h.cote_pdf for h in horses)
-        mediane = cotes_triees[len(cotes_triees) // 2]
+        cotes_connues = sorted(c for c in (_cote_reference(h) for h in horses) if c is not None)
+        if not cotes_connues:
+            raise ValueError(
+                "apply_filter: aucune cote connue (ni PDF, ni MarketWatch) dans le "
+                "peloton — impossible de calculer seuil_cote_extreme automatiquement, "
+                "fournissez-le explicitement."
+            )
+        mediane = cotes_connues[len(cotes_connues) // 2]
         seuil_cote_extreme = mediane * 6
 
     scores: dict[int, int] = {}
@@ -78,9 +99,15 @@ def apply_filter(
         scores[h.numero] = score
         motifs_par_cheval[h.numero] = motifs
 
+    # Une cote totalement inconnue (ni PDF ni MarketWatch) n'est jamais un
+    # favori : traitée comme la pire valeur possible (+inf), jamais comme 0.
+    def _cle_tri_cote(h: Horse) -> float:
+        cote = _cote_reference(h)
+        return cote if cote is not None else float("inf")
+
     favoris_forces = {
         h.numero
-        for h in sorted(horses, key=lambda h: h.cote_pdf)[: config.FORCE_KEEP_LOWEST_COTE_COUNT]
+        for h in sorted(horses, key=_cle_tri_cote)[: config.FORCE_KEEP_LOWEST_COTE_COUNT]
     }
 
     retenus: list[Horse] = []

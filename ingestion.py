@@ -174,6 +174,154 @@ def parse_horses(text: str) -> tuple[list[Horse], dict[int, list[str]], list[str
     return horses, missing, warnings
 
 
+# --------------------------------------------------------------------------
+# Repli : mise en page "en colonnes complètes". Observé sur les journaux de
+# trot avec départ autostart (ex. Enghien 28/09/2026) : chaque champ (numéro,
+# sexe/âge, distance, chrono, musique, gains, nom, driver...) forme un bloc
+# de N lignes consécutives, plutôt qu'une ligne par cheval comme dans
+# parse_horses(). N'est utilisé que si parse_horses() n'a rien trouvé — ne
+# remplace jamais le format ligne par ligne, qui reste testé et prioritaire.
+# --------------------------------------------------------------------------
+
+_RE_CONCURRENTS_N = re.compile(r"(?P<n>\d{1,2})\s+CONCURRENTS", re.IGNORECASE)
+_RE_SEXE_AGE = re.compile(r"^[FH]\.\d{1,2}$")
+_RE_COTE_LINE = re.compile(r"^\d{1,3}(?:[.,]\d+)?/\d+$")
+_RE_NARRATIVE_STOP = ("RESULTATS DES COURSES", "ARRIVEE DU", "JOURNAL HIPPIQUE",
+                       '"QUARTE"', "SUITE DE L’ARRIVÉE", "SUITE DE L'ARRIVEE")
+
+
+def _find_block(lines: list[str], start: int, n: int) -> list[str] | None:
+    if start < 0 or start + n > len(lines):
+        return None
+    return [l.strip() for l in lines[start:start + n]]
+
+
+def _find_sexe_age_anchor(lines: list[str], n: int) -> int | None:
+    for i in range(len(lines) - n + 1):
+        bloc = _find_block(lines, i, n)
+        if bloc and all(_RE_SEXE_AGE.match(l) for l in bloc):
+            return i
+    return None
+
+
+def _find_cote_blocks(lines: list[str], n: int, before: int) -> list[tuple[int, list[str]]]:
+    """Tous les blocs de n lignes-cotes consécutives avant l'index ``before``."""
+    trouves: list[tuple[int, list[str]]] = []
+    i = 0
+    while i <= before - n:
+        bloc = _find_block(lines, i, n)
+        if bloc and all(_RE_COTE_LINE.match(l) for l in bloc):
+            trouves.append((i, bloc))
+            i += n
+        else:
+            i += 1
+    return trouves
+
+
+def _narrative_comments(lines: list[str], stop_at: int, numbers: set[int]) -> dict[int, str]:
+    comments: dict[int, str] = {}
+    active: int | None = None
+    for line in lines[:stop_at]:
+        stripped = line.strip()
+        start = _COMMENT_START.search(line)
+        if start:
+            number = int(start.group("num"))
+            active = number if number in numbers else None
+            if active is not None:
+                comments[active] = start.group("text").strip()
+            continue
+        if active is not None and stripped:
+            if any(marker in stripped.upper() for marker in _RE_NARRATIVE_STOP):
+                active = None
+                continue
+            comments[active] = (comments.get(active, "") + " " + stripped).strip()
+    return comments
+
+
+class ColumnLayoutError(RuntimeError):
+    """Ni le format ligne par ligne ni le format en colonnes n'ont été reconnus."""
+
+
+def parse_horses_columnar(
+    text: str,
+) -> tuple[list[Horse], dict[int, RawHorseFields], dict[int, list[str]], list[str]]:
+    """
+    Repli pour la mise en page "en colonnes complètes" (voir commentaire
+    ci-dessus). Ne devine jamais une correspondance ambiguë : si plusieurs
+    blocs de cotes candidats existent, cote_pdf reste None et l'ambiguïté
+    est signalée dans les avertissements plutôt que résolue au hasard.
+    """
+    lines = text.splitlines()
+    concurrents_match = _RE_CONCURRENTS_N.search(text)
+    if not concurrents_match:
+        raise ColumnLayoutError("nombre de concurrents introuvable (\"N CONCURRENTS\" absent du texte)")
+    n = int(concurrents_match.group("n"))
+
+    anchor = _find_sexe_age_anchor(lines, n)
+    if anchor is None:
+        raise ColumnLayoutError(
+            f"bloc sexe/âge (motif 'F.8'/'H.7' x{n} lignes consécutives) introuvable — "
+            "mise en page ni ligne-par-ligne ni colonnes reconnue"
+        )
+
+    numeros_bloc = _find_block(lines, anchor - n, n)
+    if numeros_bloc != [str(k) for k in range(1, n + 1)]:
+        raise ColumnLayoutError(
+            f"bloc de {n} lignes avant l'ancre sexe/âge n'est pas 1..{n} : {numeros_bloc}"
+        )
+
+    dist = _find_block(lines, anchor + n, n)
+    chrono = _find_block(lines, anchor + 2 * n, n)
+    perf = _find_block(lines, anchor + 3 * n, n)
+    gains = _find_block(lines, anchor + 4 * n, n)
+    noms = _find_block(lines, anchor + 5 * n, n)
+    drivers = _find_block(lines, anchor + 6 * n, n)
+    if not all([dist, chrono, perf, gains, noms, drivers]):
+        raise ColumnLayoutError(
+            "blocs distance/chrono/musique/gains/noms/drivers incomplets après l'ancre sexe/âge "
+            "(le texte s'arrête avant la fin attendue de la table)"
+        )
+
+    warnings: list[str] = []
+    cote_candidats = _find_cote_blocks(lines, n, before=anchor - n)
+    cote_bloc: list[str] | None = None
+    if len(cote_candidats) == 1:
+        cote_bloc = cote_candidats[0][1]
+    elif len(cote_candidats) == 0:
+        warnings.append("Aucun bloc de cotes reconnu dans le texte structuré — cote_pdf laissée vide.")
+    else:
+        details = "; ".join(f"ligne {start}: {bloc}" for start, bloc in cote_candidats)
+        warnings.append(
+            f"{len(cote_candidats)} blocs de cotes candidats trouvés, valeurs différentes — "
+            f"ambigu, cote_pdf laissée vide plutôt que d'en choisir un au hasard ({details})"
+        )
+
+    numbers = set(range(1, n + 1))
+    comments = _narrative_comments(lines, stop_at=anchor - n, numbers=numbers)
+
+    horses: list[Horse] = []
+    raw_fields: dict[int, RawHorseFields] = {}
+    missing: dict[int, list[str]] = {}
+    for idx in range(n):
+        numero = idx + 1
+        gains_val = float(gains[idx].replace(" ", "")) if gains[idx].replace(" ", "").isdigit() else None
+        cote_val = float(cote_bloc[idx].split("/")[0].replace(",", ".")) if cote_bloc else None
+
+        horses.append(Horse(numero=numero, nom=noms[idx], cote_pdf=cote_val, gains_euros=gains_val))
+        raw_fields[numero] = RawHorseFields(
+            musique=perf[idx] or None,
+            driver=drivers[idx] or None,
+            commentaire=comments.get(numero),
+        )
+        horse_missing = ["cote_actuelle (MarketWatch non exécuté)", "notes BaseScorer",
+                          "ferrure_stats / historique ferrure", "non-partant actualisé"]
+        if cote_val is None:
+            horse_missing.append("cote_pdf (blocs de cotes ambigus ou absents — voir avertissements)")
+        missing[numero] = horse_missing
+
+    return horses, raw_fields, missing, warnings
+
+
 def extract_raw_fields(text: str, horses: list[Horse]) -> tuple[dict[int, RawHorseFields], str | None, str | None]:
     """Expose les colonnes et commentaires lisibles, sans les noter.
 
@@ -303,6 +451,13 @@ class LonabIngestion:
         text = extract_pdf_text(content)
         horses, missing, warnings = parse_horses(text)
         raw_fields, distance_raw, discipline_raw = extract_raw_fields(text, horses)
+        if not horses:
+            try:
+                horses, raw_fields_col, missing, col_warnings = parse_horses_columnar(text)
+                raw_fields = raw_fields_col
+                warnings = warnings + ["Format ligne par ligne non reconnu — repli colonnes utilisé."] + col_warnings
+            except ColumnLayoutError as exc:
+                warnings.append(f"Repli colonnes également en échec : {exc}")
         return IngestionResult(
             journal=journal,
             pdf_bytes=content,
